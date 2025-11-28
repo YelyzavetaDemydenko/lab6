@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 data class AssemblyEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
-    val mechanismId: Int?,
+    var mechanismId: Int?,
     val warehouseId: Int?,
     val name: String,
     val manufacturer: String,

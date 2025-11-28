@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 data class DetailEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
-    val assemblyId: Int?,
+    var assemblyId: Int?,
     val warehouseId: Int?,
     val name: String,
     val manufacturer: String,

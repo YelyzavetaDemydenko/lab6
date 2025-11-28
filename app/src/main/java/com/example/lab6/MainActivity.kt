@@ -59,8 +59,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import com.example.lab6.data.AppDatabase
+import com.example.lab6.data.entities.AssemblyEntity
+import com.example.lab6.data.entities.DetailEntity
+import com.example.lab6.data.entities.MechanismEntity
 import kotlinx.coroutines.launch
 
 
@@ -87,7 +91,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             Lab6Theme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    App(warehouseRepo = warehouseRepo)
+                    App(warehouseRepo = warehouseRepo,
+                        detailRepo = detailRepo,
+                        assemblyRepo = assemblyRepo,
+                        mechanismRepo = mechanismRepo)
                 }
             }
         }
@@ -96,7 +103,11 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun App(warehouseRepo: WarehouseRepository) {
+fun App(warehouseRepo: WarehouseRepository,
+        detailRepo: DetailRepository,
+        assemblyRepo: AssemblyRepository,
+        mechanismRepo: MechanismRepository) {
+
     var screen by remember { mutableStateOf("main") }
     var currentWarehouse by remember { mutableStateOf<WarehouseEntity?>(null) }
 
@@ -127,6 +138,9 @@ fun App(warehouseRepo: WarehouseRepository) {
         "menu" -> MenuScreen(
             warehouseRepo = warehouseRepo,
             currentWarehouse = currentWarehouse,
+            detailRepo = detailRepo,
+            assemblyRepo = assemblyRepo,
+            mechanismRepo = mechanismRepo,
             onLogout = {
                 currentWarehouse = null
                 screen = "main"
@@ -336,6 +350,9 @@ fun LoginScreen(
 @Composable
 fun MenuScreen(
     warehouseRepo: WarehouseRepository,
+    detailRepo: DetailRepository,
+    assemblyRepo: AssemblyRepository,
+    mechanismRepo: MechanismRepository,
     currentWarehouse: WarehouseEntity?,
     onLogout: () -> Unit
 ) {
@@ -397,8 +414,10 @@ fun MenuScreen(
                 )
 
                 "Додати" -> AddTab(
-                    warehouseRepo = warehouseRepo,
-                    warehouse = currentWarehouse
+                    warehouseId = currentWarehouse.id,
+                    detailRepo = detailRepo,
+                    assemblyRepo = assemblyRepo,
+                    mechanismRepo = mechanismRepo
                 )
             }
         }
@@ -440,21 +459,35 @@ fun WarehouseTab(
 
         when (selectedTab) {
             0 -> DetailsList(
-                warehouse = warehouse,
+                warehouseId = warehouse.id,
+                detailRepo = detailRepo,
                 onDeleteDetail = { detail ->
                     scope.launch { detailRepo.deleteDetail(detail) }
+                },
+                onUpdateDetail = {detail ->
+                    scope.launch { detailRepo.updateDetail(detail)}
                 }
             )
             1 -> AssembliesList(
-                warehouse = warehouse,
+                warehouseId = warehouse.id,
+                assemblyRepo = assemblyRepo,
+                detailRepo = detailRepo,
                 onDeleteAssembly = { assembly ->
                     scope.launch { assemblyRepo.deleteAssembly(assembly) }
+                },
+                onUpdateAssembly = {assembly ->
+                    scope.launch { assemblyRepo.updateAssembly(assembly)}
                 }
             )
             2 -> MechanismsList(
-                warehouse = warehouse,
-                onDeleteMechanism = { mech ->
-                    scope.launch { mechanismRepo.deleteMechanism(mech) }
+                warehouseId = warehouse.id,
+                mechanismRepo = mechanismRepo,
+                assemblyRepo = assemblyRepo,
+                onDeleteMechanism = { mechanism ->
+                    scope.launch { mechanismRepo.deleteMechanism(mechanism) }
+                },
+                onUpdateMechanism = {mechanism ->
+                    scope.launch { mechanismRepo.updateMechanism(mechanism)}
                 }
             )
         }
@@ -497,21 +530,35 @@ fun TabButton(text: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-fun DetailsList(warehouse: Warehouse, onDeleteDetail: (Detail) -> Unit) {
+fun DetailsList(
+    warehouseId: Int,
+    detailRepo: DetailRepository,
+    onDeleteDetail: (DetailEntity) -> Unit,
+    onUpdateDetail: (DetailEntity) -> Unit
+) {
+    // Тягнемо деталі з БД по складу
+    var details by remember { mutableStateOf<List<DetailEntity>>(emptyList()) }
 
+    LaunchedEffect(warehouseId) {
+        details = detailRepo.getDetailsByWarehouse(warehouseId)
+    }
 
     LazyColumn {
-        if (warehouse.allDetails.isEmpty()) {
+        if (details.isEmpty()) {
             item {
-                Text("Жодної деталі не додано", modifier = Modifier.padding(start = 10.dp), fontSize = 15.sp)
+                Text(
+                    "Жодної деталі не додано",
+                    modifier = Modifier.padding(start = 10.dp),
+                    fontSize = 15.sp
+                )
             }
         } else {
-            items(warehouse.allDetails) { detail ->
+            items(details) { detail ->
+
                 var expanded by remember { mutableStateOf(false) }
                 var isEditing by remember { mutableStateOf(false) }
                 var showDeleteDialog by remember { mutableStateOf(false) }
 
-                // поля редактирования
                 var manufacturer by remember { mutableStateOf(detail.manufacturer) }
                 var year by remember { mutableStateOf(detail.year.toString()) }
                 var price by remember { mutableStateOf(detail.price.toString()) }
@@ -523,7 +570,6 @@ fun DetailsList(warehouse: Warehouse, onDeleteDetail: (Detail) -> Unit) {
                         .padding(vertical = 4.dp)
                 ) {
 
-                    // ==== Заголовок детали ====
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -531,7 +577,7 @@ fun DetailsList(warehouse: Warehouse, onDeleteDetail: (Detail) -> Unit) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row (modifier = Modifier.clickable { expanded = !expanded }){
+                        Row(modifier = Modifier.clickable { expanded = !expanded }) {
                             Text(detail.name, fontSize = 20.sp)
                             Text(
                                 if (expanded) " −" else " +",
@@ -540,7 +586,6 @@ fun DetailsList(warehouse: Warehouse, onDeleteDetail: (Detail) -> Unit) {
                             )
                         }
 
-                        // ==== Кнопка редактировать ====
                         IconButton(onClick = {
                             expanded = true
                             isEditing = !isEditing
@@ -552,24 +597,18 @@ fun DetailsList(warehouse: Warehouse, onDeleteDetail: (Detail) -> Unit) {
                         }
                     }
 
-                    // ==== Раскрытая часть ====
                     if (expanded) {
 
                         if (!isEditing) {
-                            // ----- обычный режим (просмотр) -----
                             Column(modifier = Modifier.padding(start = 26.dp)) {
                                 Text("- Виробник: ${detail.manufacturer}")
                                 Text("- Рік виготовлення: ${detail.year}")
                                 Text("- Ціна: ${detail.price}")
-                                Text(
-                                    "- Матеріал: ${
-                                        detail.material.ifBlank { "не вказано" }
-                                    }"
-                                )
+                                Text("- Матеріал: ${detail.material.ifBlank { "не вказано" }}")
                             }
 
                         } else {
-                            // ----- режим редактирования -----
+
                             Column(modifier = Modifier.padding(start = 26.dp)) {
 
                                 OutlinedTextField(
@@ -605,10 +644,15 @@ fun DetailsList(warehouse: Warehouse, onDeleteDetail: (Detail) -> Unit) {
                                     modifier = Modifier.padding(top = 8.dp)
                                 ) {
                                     Button(onClick = {
-                                        detail.manufacturer = manufacturer
-                                        detail.year = year.toIntOrNull() ?: detail.year
-                                        detail.price = price.toDoubleOrNull() ?: detail.price
-                                        detail.material = material
+                                        // Зберегти зміни в БД
+                                        val updated = detail.copy(
+                                            manufacturer = manufacturer,
+                                            year = year.toIntOrNull() ?: detail.year,
+                                            price = price.toDoubleOrNull() ?: detail.price,
+                                            material = material
+                                        )
+
+                                        onUpdateDetail(updated)
 
                                         isEditing = false
                                     }) {
@@ -616,7 +660,6 @@ fun DetailsList(warehouse: Warehouse, onDeleteDetail: (Detail) -> Unit) {
                                     }
 
                                     OutlinedButton(onClick = {
-                                        // отмена: вернуть старые значения
                                         manufacturer = detail.manufacturer
                                         year = detail.year.toString()
                                         price = detail.price.toString()
@@ -637,7 +680,6 @@ fun DetailsList(warehouse: Warehouse, onDeleteDetail: (Detail) -> Unit) {
                                     Text("Видалити", color = Color.White)
                                 }
 
-                                // ===== Диалог подтверждения удаления =====
                                 if (showDeleteDialog) {
                                     AlertDialog(
                                         onDismissRequest = { showDeleteDialog = false },
@@ -647,12 +689,8 @@ fun DetailsList(warehouse: Warehouse, onDeleteDetail: (Detail) -> Unit) {
                                             TextButton(onClick = {
                                                 onDeleteDetail(detail)
                                                 showDeleteDialog = false
-                                            },
-                                                colors = ButtonDefaults.textButtonColors(
-                                                    contentColor = Color.Red // колір тексту
-                                                )
-                                            ) {
-                                                Text("Видалити")
+                                            }) {
+                                                Text("Видалити", color = Color.Red)
                                             }
                                         },
                                         dismissButton = {
@@ -671,17 +709,28 @@ fun DetailsList(warehouse: Warehouse, onDeleteDetail: (Detail) -> Unit) {
     }
 }
 
-@Composable
-fun AssembliesList(warehouse: Warehouse, onDeleteAssembly: (Assembly) -> Unit) {
 
+@Composable
+fun AssembliesList(warehouseId: Int,
+                   assemblyRepo: AssemblyRepository,
+                   detailRepo: DetailRepository,
+                   onDeleteAssembly: (AssemblyEntity) -> Unit,
+                   onUpdateAssembly: (AssemblyEntity) -> Unit
+) {
+
+    var assemblies by remember { mutableStateOf<List<AssemblyEntity>>(emptyList()) }
+
+    LaunchedEffect(warehouseId) {
+        assemblies = assemblyRepo.getAssembliesByWarehouse(warehouseId)
+    }
 
     LazyColumn {
-        if (warehouse.allAssemblies.isEmpty()) {
+        if (assemblies.isEmpty()) {
             item {
                 Text("Жодного вузла не додано", modifier = Modifier.padding(start = 10.dp), fontSize = 15.sp)
             }
         } else {
-            items(warehouse.allAssemblies) { assembly ->
+            items(assemblies) { assembly ->
 
                 var expanded by remember { mutableStateOf(false) }
                 var isEditing by remember { mutableStateOf(false) }
@@ -729,17 +778,22 @@ fun AssembliesList(warehouse: Warehouse, onDeleteAssembly: (Assembly) -> Unit) {
 
                         if (!isEditing) {
                             // Просмотр обычных данных
+                            val assemblyDetails by produceState(initialValue = emptyList<DetailEntity>(), assembly) {
+                                value = detailRepo.getDetailsByAssembly(assembly.id)
+                            }
+
                             Column(modifier = Modifier.padding(start = 26.dp)) {
                                 Text("- Виробник: ${assembly.manufacturer}")
                                 Text("- Рік виготовлення: ${assembly.year}")
                                 Text("- Ціна: ${assembly.price}")
                                 Text(
                                     "- Деталі: ${
-                                        if (assembly.details.isEmpty()) "не вказано"
-                                        else assembly.details.joinToString(", ") { it.name }
+                                        if (assemblyDetails.isEmpty()) "не вказано"
+                                        else assemblyDetails.joinToString(", ") { it.name }
                                     }"
                                 )
                             }
+
 
                         } else {
                             // ===== Режим редактирования =====
@@ -771,9 +825,15 @@ fun AssembliesList(warehouse: Warehouse, onDeleteAssembly: (Assembly) -> Unit) {
                                     modifier = Modifier.padding(top = 8.dp)
                                 ) {
                                     Button(onClick = {
-                                        assembly.manufacturer = manufacturer
-                                        assembly.year = year.toIntOrNull() ?: assembly.year
-                                        assembly.price = price.toDoubleOrNull() ?: assembly.price
+                                        // Зберегти зміни в БД
+                                        val updated = assembly.copy(
+                                            manufacturer = manufacturer,
+                                            year = year.toIntOrNull() ?: assembly.year,
+                                            price = price.toDoubleOrNull() ?: assembly.price,
+                                        )
+
+                                        onUpdateAssembly(updated)
+
                                         isEditing = false
                                     }) {
                                         Text("Зберегти")
@@ -836,17 +896,26 @@ fun AssembliesList(warehouse: Warehouse, onDeleteAssembly: (Assembly) -> Unit) {
 
 @Composable
 fun MechanismsList(
-    warehouse: Warehouse,
-    onDeleteMechanism: (Mechanism) -> Unit
+    warehouseId: Int,
+    mechanismRepo: MechanismRepository,
+    assemblyRepo: AssemblyRepository,
+    onDeleteMechanism: (MechanismEntity) -> Unit,
+    onUpdateMechanism: (MechanismEntity) -> Unit
 ) {
 
+    var mechanisms by remember { mutableStateOf<List<MechanismEntity>>(emptyList()) }
+
+    LaunchedEffect(warehouseId) {
+        mechanisms = mechanismRepo.getMechanismsByWarehouse(warehouseId)
+    }
+
     LazyColumn {
-        if (warehouse.allMechanisms.isEmpty()) {
+        if (mechanisms.isEmpty()) {
             item {
                 Text("Жодного механізму не додано", modifier = Modifier.padding(start = 10.dp), fontSize = 15.sp)
             }
         } else {
-            items(warehouse.allMechanisms) { mechanism ->
+            items(mechanisms) { mechanism ->
 
                 var expanded by remember { mutableStateOf(false) }
                 var isEditing by remember { mutableStateOf(false) }
@@ -890,18 +959,24 @@ fun MechanismsList(
 
                     if (expanded) {
                         if (!isEditing) {
+                            // Просмотр обычных данных
+                            val mechanismAssemblies by produceState(initialValue = emptyList<AssemblyEntity>(), mechanism) {
+                                value = assemblyRepo.getAssembliesByMechanism(mechanism.id)
+                            }
 
-                            Column(modifier = Modifier.padding(start = 20.dp)) {
+                            Column(modifier = Modifier.padding(start = 26.dp)) {
                                 Text("- Виробник: ${mechanism.manufacturer}")
                                 Text("- Рік виготовлення: ${mechanism.year}")
                                 Text("- Ціна: ${mechanism.price}")
                                 Text(
-                                    "- Вузли: ${
-                                        if (mechanism.assemblies.isEmpty()) "не вказано"
-                                        else mechanism.assemblies.joinToString(", ") { it.name }
+                                    "- Деталі: ${
+                                        if (mechanismAssemblies.isEmpty()) "не вказано"
+                                        else mechanismAssemblies.joinToString(", ") { it.name }
                                     }"
                                 )
                             }
+
+
 
                         } else {
                             // ===== Режим редагування =====
@@ -933,9 +1008,15 @@ fun MechanismsList(
                                     modifier = Modifier.padding(top = 8.dp)
                                 ) {
                                     Button(onClick = {
-                                        mechanism.manufacturer = manufacturer
-                                        mechanism.year = year.toIntOrNull() ?: mechanism.year
-                                        mechanism.price = price.toDoubleOrNull() ?: mechanism.price
+                                        // Зберегти зміни в БД
+                                        val updated = mechanism.copy(
+                                            manufacturer = manufacturer,
+                                            year = year.toIntOrNull() ?: mechanism.year,
+                                            price = price.toDoubleOrNull() ?: mechanism.price,
+                                        )
+
+                                        onUpdateMechanism(updated)
+
                                         isEditing = false
                                     }) {
                                         Text("Зберегти")
@@ -1000,7 +1081,14 @@ fun MechanismsList(
 
 
 @Composable
-fun AddTab(warehouse: Warehouse) {
+fun AddTab(
+    warehouseId: Int,
+    mechanismRepo: MechanismRepository,
+    assemblyRepo: AssemblyRepository,
+    detailRepo: DetailRepository
+) {
+    val scope = rememberCoroutineScope()
+
     var category by remember { mutableStateOf<String?>(null) }
     var name by remember { mutableStateOf("") }
     var manufacturer by remember { mutableStateOf("") }
@@ -1010,12 +1098,21 @@ fun AddTab(warehouse: Warehouse) {
     var showErrors by remember { mutableStateOf(false) }
 
     var searchQueryDetails by remember { mutableStateOf("") }
-    var searchResultsDetails by remember { mutableStateOf(listOf<Detail>()) }
-    var selectedDetails by remember { mutableStateOf(setOf<Detail>()) }
+    var searchResultsDetails by remember { mutableStateOf(listOf<DetailEntity>()) }
+    var selectedDetails by remember { mutableStateOf(setOf<DetailEntity>()) }
 
     var searchQueryAssemblies by remember { mutableStateOf("") }
-    var searchResultsAssemblies by remember { mutableStateOf(listOf<Assembly>()) }
-    var selectedAssemblies by remember { mutableStateOf(setOf<Assembly>()) }
+    var searchResultsAssemblies by remember { mutableStateOf(listOf<AssemblyEntity>()) }
+    var selectedAssemblies by remember { mutableStateOf(setOf<AssemblyEntity>()) }
+
+    // Загружаем все детали и узлы по складу для поиска
+    var allDetails by remember { mutableStateOf(listOf<DetailEntity>()) }
+    var allAssemblies by remember { mutableStateOf(listOf<AssemblyEntity>()) }
+
+    LaunchedEffect(warehouseId) {
+        allDetails = detailRepo.getDetailsByWarehouse(warehouseId)
+        allAssemblies = assemblyRepo.getAssembliesByWarehouse(warehouseId)
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -1024,11 +1121,8 @@ fun AddTab(warehouse: Warehouse) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        item {
-            Text("Додати", fontSize = 30.sp, modifier = Modifier.padding(8.dp))
-        }
+        item { Text("Додати", fontSize = 30.sp, modifier = Modifier.padding(8.dp)) }
 
-        // --- Вибір типу ---
         if (category == null) {
             item {
                 Text("Оберіть тип:", fontSize = 16.sp, modifier = Modifier.padding(8.dp))
@@ -1039,21 +1133,13 @@ fun AddTab(warehouse: Warehouse) {
                             name = ""; manufacturer = ""; year = ""; price = ""; material = ""
                             searchQueryDetails = ""; searchResultsDetails = emptyList(); selectedDetails = emptySet()
                             searchQueryAssemblies = ""; searchResultsAssemblies = emptyList(); selectedAssemblies = emptySet()
-                        }) {
-                            Text(type)
-                        }
+                        }) { Text(type) }
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
             }
-
         } else {
-
-            // ------------------- Базові поля -------------------
-            item {
-                Text("Тип: $category", fontSize = 16.sp)
-                Spacer(modifier = Modifier.height(8.dp))
-            }
+            item { Text("Тип: $category", fontSize = 16.sp); Spacer(modifier = Modifier.height(8.dp)) }
 
             item {
                 OutlinedTextField(
@@ -1062,9 +1148,8 @@ fun AddTab(warehouse: Warehouse) {
                     isError = showErrors && name.isBlank(),
                     modifier = Modifier.fillMaxWidth()
                 )
-                if (showErrors && name.isBlank()) {
+                if (showErrors && name.isBlank())
                     Text("Це поле обов'язкове", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-                }
             }
 
             item {
@@ -1074,9 +1159,8 @@ fun AddTab(warehouse: Warehouse) {
                     isError = showErrors && manufacturer.isBlank(),
                     modifier = Modifier.fillMaxWidth()
                 )
-                if (showErrors && manufacturer.isBlank()) {
+                if (showErrors && manufacturer.isBlank())
                     Text("Це поле обов'язкове", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-                }
             }
 
             item {
@@ -1086,9 +1170,8 @@ fun AddTab(warehouse: Warehouse) {
                     isError = showErrors && year.isBlank(),
                     modifier = Modifier.fillMaxWidth()
                 )
-                if (showErrors && year.isBlank()) {
+                if (showErrors && year.isBlank())
                     Text("Це поле обов'язкове", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-                }
             }
 
             item {
@@ -1098,9 +1181,8 @@ fun AddTab(warehouse: Warehouse) {
                     isError = showErrors && price.isBlank(),
                     modifier = Modifier.fillMaxWidth()
                 )
-                if (showErrors && price.isBlank()) {
+                if (showErrors && price.isBlank())
                     Text("Це поле обов'язкове", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-                }
             }
 
             if (category == "Деталь") {
@@ -1114,9 +1196,8 @@ fun AddTab(warehouse: Warehouse) {
                 }
             }
 
-            // ============= ВУЗОЛ =============
+            // ---------- Вузол ----------
             if (category == "Вузол") {
-
                 item {
                     OutlinedTextField(
                         value = searchQueryDetails,
@@ -1125,20 +1206,15 @@ fun AddTab(warehouse: Warehouse) {
                         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
                     )
                 }
-
                 item {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = {
-                            searchResultsDetails = warehouse.allDetails.filter {
-                                it.name.contains(searchQueryDetails, ignoreCase = true)
-                            }
+                            searchResultsDetails = allDetails.filter { it.name.contains(searchQueryDetails, ignoreCase = true) }
                         }) { Text("Пошук деталей") }
-
                         Spacer(modifier = Modifier.weight(1f))
                         Text("Вибрано: ${selectedDetails.size}", modifier = Modifier.align(Alignment.CenterVertically))
                     }
                 }
-
                 if (searchResultsDetails.isNotEmpty()) {
                     items(searchResultsDetails) { detail ->
                         val checked = selectedDetails.contains(detail)
@@ -1155,16 +1231,11 @@ fun AddTab(warehouse: Warehouse) {
                             Text(detail.name, modifier = Modifier.padding(start = 8.dp))
                         }
                     }
-                } else {
-                    item {
-                        Text("(Пошук нічого не знайшов)", modifier = Modifier.padding(8.dp))
-                    }
-                }
+                } else item { Text("(Пошук нічого не знайшов)", modifier = Modifier.padding(8.dp)) }
             }
 
-            // ============= МЕХАНІЗМ =============
+            // ---------- Механізм ----------
             if (category == "Механізм") {
-
                 item {
                     OutlinedTextField(
                         value = searchQueryAssemblies,
@@ -1173,20 +1244,15 @@ fun AddTab(warehouse: Warehouse) {
                         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
                     )
                 }
-
                 item {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = {
-                            searchResultsAssemblies = warehouse.allAssemblies.filter {
-                                it.name.contains(searchQueryAssemblies, ignoreCase = true)
-                            }
+                            searchResultsAssemblies = allAssemblies.filter { it.name.contains(searchQueryAssemblies, ignoreCase = true) }
                         }) { Text("Пошук вузлів") }
-
                         Spacer(modifier = Modifier.weight(1f))
                         Text("Вибрано: ${selectedAssemblies.size}", modifier = Modifier.align(Alignment.CenterVertically))
                     }
                 }
-
                 if (searchResultsAssemblies.isNotEmpty()) {
                     items(searchResultsAssemblies) { assembly ->
                         val checked = selectedAssemblies.contains(assembly)
@@ -1203,17 +1269,12 @@ fun AddTab(warehouse: Warehouse) {
                             Text(assembly.name, modifier = Modifier.padding(start = 8.dp))
                         }
                     }
-                } else {
-                    item {
-                        Text("(Пошук нічого не знайшов)", modifier = Modifier.padding(8.dp))
-                    }
-                }
+                } else item { Text("(Пошук нічого не знайшов)", modifier = Modifier.padding(8.dp)) }
             }
 
-            // ---------- КНОПКИ ----------
+            // ---------- Кнопки ----------
             item {
                 Spacer(modifier = Modifier.height(12.dp))
-
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = {
                         showErrors = true
@@ -1223,40 +1284,51 @@ fun AddTab(warehouse: Warehouse) {
                         val p = price.toDoubleOrNull() ?: 0.0
 
                         when (category) {
-                            "Деталь" -> warehouse.buy(Detail(name, manufacturer, y, p, material))
-                            "Вузол" -> {
-                                warehouse.buy(Assembly(name, manufacturer, y, p, selectedDetails.toList()))
-                                warehouse.allDetails.removeAll(selectedDetails)
+                            "Деталь" -> scope.launch {
+                                val detail = DetailEntity(id = 0, warehouseId = warehouseId, assemblyId = null, name = name, manufacturer = manufacturer, year = y, price = p, material = material)
+                                detailRepo.insertDetail(detail)
+                                allDetails = detailRepo.getDetailsByWarehouse(warehouseId)
                             }
-                            "Механізм" -> {
-                                warehouse.buy(Mechanism(name, manufacturer, y, p, selectedAssemblies.toList()))
-                                warehouse.allAssemblies.removeAll(selectedAssemblies)
+                            "Вузол" -> scope.launch {
+                                val assembly = AssemblyEntity(0, null, warehouseId, name, manufacturer, y, p)
+                                assemblyRepo.insertAssembly(assembly)
+                                // добавить связи с деталями
+                                selectedDetails.forEach { d ->
+                                    d.assemblyId = assembly.id
+                                    detailRepo.updateDetail(d)
+                                }
+                                allAssemblies = assemblyRepo.getAssembliesByWarehouse(warehouseId)
+                                allDetails = detailRepo.getDetailsByWarehouse(warehouseId)
+                            }
+                            "Механізм" -> scope.launch {
+                                val mechanism = MechanismEntity(0, warehouseId, name, manufacturer, y, p)
+                                mechanismRepo.insertMechanism(mechanism)
+                                // добавить связи с выбранными узлами
+                                selectedAssemblies.forEach { a ->
+                                    a.mechanismId = mechanism.id
+                                    assemblyRepo.updateAssembly(a)
+                                }
                             }
                         }
 
-                        category = null
-                        name = ""; manufacturer = ""; year = ""; price = ""; material = ""
+                        // сброс полей
+                        category = null; name = ""; manufacturer = ""; year = ""; price = ""; material = ""
                         selectedDetails = emptySet(); selectedAssemblies = emptySet()
                         searchQueryDetails = ""; searchResultsDetails = emptyList()
                         searchQueryAssemblies = ""; searchResultsAssemblies = emptyList()
                         showErrors = false
-                    }) {
-                        Text("Додати")
-                    }
+                    }) { Text("Додати") }
 
                     Button(onClick = {
-                        showErrors = false
-                        category = null
+                        showErrors = false; category = null
                         name = ""; manufacturer = ""; year = ""; price = ""; material = ""
-                        selectedDetails = emptySet()
-                        selectedAssemblies = emptySet()
+                        selectedDetails = emptySet(); selectedAssemblies = emptySet()
                         searchQueryDetails = ""; searchResultsDetails = emptyList()
                         searchQueryAssemblies = ""; searchResultsAssemblies = emptyList()
-                    }) {
-                        Text("Назад")
-                    }
+                    }) { Text("Назад") }
                 }
             }
         }
     }
 }
+
