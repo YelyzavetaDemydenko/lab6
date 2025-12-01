@@ -9,9 +9,9 @@ data class DetailEntity(
     val id: Int = 0,
     var assemblyId: Int?,
     val warehouseId: Int?,
-    val name: String,
-    val manufacturer: String,
+    var name: String,
+    var manufacturer: String,
     val year: Int,
     val price: Double,
-    val material: String
+    var material: String
 )

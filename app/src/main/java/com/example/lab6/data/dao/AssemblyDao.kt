@@ -12,7 +12,7 @@ import com.example.lab6.data.entities.AssemblyEntity
 @Dao
 interface AssemblyDao {
     @Insert
-    suspend fun insert(assembly: AssemblyEntity)
+    suspend fun insert(assembly: AssemblyEntity): Long
 
     @Update
     suspend fun update(assembly: AssemblyEntity)

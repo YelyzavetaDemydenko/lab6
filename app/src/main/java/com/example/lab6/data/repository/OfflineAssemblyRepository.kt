@@ -13,7 +13,8 @@ class OfflineAssemblyRepository(private val dao: AssemblyDao) : AssemblyReposito
     override suspend fun getAssembliesByMechanism(mechanismId: Int): List<AssemblyEntity> =
         dao.getByMechanism(mechanismId)
 
-    override suspend fun insertAssembly(assembly: AssemblyEntity) = dao.insert(assembly)
+    override suspend fun insertAssembly(assembly: AssemblyEntity): Long =
+        dao.insert(assembly)
 
     override suspend fun updateAssembly(assembly: AssemblyEntity) = dao.update(assembly)
 

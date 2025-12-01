@@ -969,7 +969,7 @@ fun MechanismsList(
                                 Text("- Рік виготовлення: ${mechanism.year}")
                                 Text("- Ціна: ${mechanism.price}")
                                 Text(
-                                    "- Деталі: ${
+                                    "- Вузли: ${
                                         if (mechanismAssemblies.isEmpty()) "не вказано"
                                         else mechanismAssemblies.joinToString(", ") { it.name }
                                     }"
@@ -1280,28 +1280,55 @@ fun AddTab(
                         showErrors = true
                         if (name.isBlank() || manufacturer.isBlank() || year.isBlank() || price.isBlank()) return@Button
 
-                        val y = year.toIntOrNull() ?: 2024
+                        val n = name.toString()
+                        val man = manufacturer.toString()
+
+                        val y = year.toIntOrNull() ?: 2025
                         val p = price.toDoubleOrNull() ?: 0.0
 
                         when (category) {
                             "Деталь" -> scope.launch {
-                                val detail = DetailEntity(id = 0, warehouseId = warehouseId, assemblyId = null, name = name, manufacturer = manufacturer, year = y, price = p, material = material)
+                                val mat = material.toString()
+                                val detail = DetailEntity(id = 0,
+                                    assemblyId = null,
+                                    warehouseId = warehouseId,
+                                    name = n,
+                                    manufacturer = man,
+                                    year = y,
+                                    price = p,
+                                    material = mat
+                                )
                                 detailRepo.insertDetail(detail)
                                 allDetails = detailRepo.getDetailsByWarehouse(warehouseId)
                             }
                             "Вузол" -> scope.launch {
-                                val assembly = AssemblyEntity(0, null, warehouseId, name, manufacturer, y, p)
-                                assemblyRepo.insertAssembly(assembly)
-                                // добавить связи с деталями
+                                val assembly = AssemblyEntity(
+                                    mechanismId = null,
+                                    warehouseId = warehouseId,
+                                    name = n,
+                                    manufacturer = man,
+                                    year = y,
+                                    price = p
+                                )
+
+                                val newId = assemblyRepo.insertAssembly(assembly)
+                                assembly.id = newId.toInt()
+
                                 selectedDetails.forEach { d ->
                                     d.assemblyId = assembly.id
                                     detailRepo.updateDetail(d)
                                 }
+
                                 allAssemblies = assemblyRepo.getAssembliesByWarehouse(warehouseId)
                                 allDetails = detailRepo.getDetailsByWarehouse(warehouseId)
                             }
                             "Механізм" -> scope.launch {
-                                val mechanism = MechanismEntity(0, warehouseId, name, manufacturer, y, p)
+                                val mechanism = MechanismEntity(0,
+                                    warehouseId,
+                                    n,
+                                    man,
+                                    y,
+                                    p)
                                 mechanismRepo.insertMechanism(mechanism)
                                 // добавить связи с выбранными узлами
                                 selectedAssemblies.forEach { a ->
