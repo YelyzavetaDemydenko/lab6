@@ -10,4 +10,5 @@ interface DetailRepository {
     suspend fun insertDetail(detail: DetailEntity)
     suspend fun updateDetail(detail: DetailEntity)
     suspend fun deleteDetail(detail: DetailEntity)
+    suspend fun updateAssemblyIdForDetail(detailId: Int, assemblyId: Int?)
 }

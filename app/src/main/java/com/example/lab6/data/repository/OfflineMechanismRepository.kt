@@ -13,8 +13,8 @@ class OfflineMechanismRepository(private val dao: MechanismDao) : MechanismRepos
         return dao.getByWarehouse(warehouseId)
     }
 
-    override suspend fun insertMechanism(mechanism: MechanismEntity) {
-        dao.insert(mechanism)
+    override suspend fun insertMechanism(mechanism: MechanismEntity): Long {
+        return dao.insert(mechanism)
     }
 
     override suspend fun updateMechanism(mechanism: MechanismEntity) {

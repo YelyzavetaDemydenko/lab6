@@ -11,7 +11,7 @@ import com.example.lab6.data.entities.MechanismEntity
 @Dao
 interface MechanismDao {
     @Insert
-    suspend fun insert(mechanism: MechanismEntity)
+    suspend fun insert(mechanism: MechanismEntity) : Long
 
     @Update
     suspend fun update(mechanism: MechanismEntity)

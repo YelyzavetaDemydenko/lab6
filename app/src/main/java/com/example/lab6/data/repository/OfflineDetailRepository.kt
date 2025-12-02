@@ -9,13 +9,12 @@ class OfflineDetailRepository(private val dao: DetailDao) : DetailRepository {
         return dao.getAll()
     }
 
-    override suspend fun getDetailsByWarehouse(warehouseId: Int): List<DetailEntity> {
-        return dao.getAll().filter { it.warehouseId == warehouseId }
-    }
+    override suspend fun getDetailsByWarehouse(warehouseId: Int) =
+        dao.getByWarehouse(warehouseId)
 
-    override suspend fun getDetailsByAssembly(assemblyId: Int): List<DetailEntity> {
-        return dao.getAll().filter { it.assemblyId == assemblyId }
-    }
+    override suspend fun getDetailsByAssembly(assemblyId: Int) =
+        dao.getByAssembly(assemblyId)
+
 
     override suspend fun insertDetail(detail: DetailEntity) {
         dao.insert(detail)
@@ -27,5 +26,9 @@ class OfflineDetailRepository(private val dao: DetailDao) : DetailRepository {
 
     override suspend fun deleteDetail(detail: DetailEntity) {
         dao.delete(detail)
+    }
+
+    override suspend fun updateAssemblyIdForDetail(detailId: Int, assemblyId: Int?) {
+        dao.updateAssemblyIdForDetail(detailId, assemblyId)
     }
 }

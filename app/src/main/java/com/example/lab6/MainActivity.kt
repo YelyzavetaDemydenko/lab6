@@ -7,6 +7,7 @@ import com.example.lab6.logic.Mechanism
 import com.example.lab6.logic.Warehouse
 import com.example.lab6.ui.theme.Lab6Theme
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -1099,7 +1100,7 @@ fun AddTab(
 
     var searchQueryDetails by remember { mutableStateOf("") }
     var searchResultsDetails by remember { mutableStateOf(listOf<DetailEntity>()) }
-    var selectedDetails by remember { mutableStateOf(setOf<DetailEntity>()) }
+    var selectedDetailIds by remember { mutableStateOf(setOf<Int>()) }
 
     var searchQueryAssemblies by remember { mutableStateOf("") }
     var searchResultsAssemblies by remember { mutableStateOf(listOf<AssemblyEntity>()) }
@@ -1131,7 +1132,7 @@ fun AddTab(
                         Button(onClick = {
                             category = type
                             name = ""; manufacturer = ""; year = ""; price = ""; material = ""
-                            searchQueryDetails = ""; searchResultsDetails = emptyList(); selectedDetails = emptySet()
+                            searchQueryDetails = ""; searchResultsDetails = emptyList(); selectedDetailIds = emptySet()
                             searchQueryAssemblies = ""; searchResultsAssemblies = emptyList(); selectedAssemblies = emptySet()
                         }) { Text(type) }
                     }
@@ -1210,22 +1211,31 @@ fun AddTab(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = {
                             searchResultsDetails = allDetails.filter { it.name.contains(searchQueryDetails, ignoreCase = true) }
+
+                            // Логируем ID и имена отфильтрованных деталей
+                            Log.d("DEBUG", "Search results:")
+                            searchResultsDetails.forEach { detail ->
+                                Log.d("DEBUG", "Detail ID=${detail.id}, name=${detail.name}")
+                            }
                         }) { Text("Пошук деталей") }
+
                         Spacer(modifier = Modifier.weight(1f))
-                        Text("Вибрано: ${selectedDetails.size}", modifier = Modifier.align(Alignment.CenterVertically))
+                        Text("Вибрано: ${selectedDetailIds.size}", modifier = Modifier.align(Alignment.CenterVertically))
                     }
                 }
                 if (searchResultsDetails.isNotEmpty()) {
                     items(searchResultsDetails) { detail ->
-                        val checked = selectedDetails.contains(detail)
+                        val checked = selectedDetailIds.contains(detail.id)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                         ) {
+
                             Checkbox(
                                 checked = checked,
                                 onCheckedChange = { now ->
-                                    selectedDetails = if (now) selectedDetails + detail else selectedDetails - detail
+                                    selectedDetailIds = if (now) selectedDetailIds + detail.id else selectedDetailIds - detail.id
+                                    Log.d("DEBUG", "SelectedDetailIds now: $selectedDetailIds")
                                 }
                             )
                             Text(detail.name, modifier = Modifier.padding(start = 8.dp))
@@ -1282,14 +1292,14 @@ fun AddTab(
 
                         val n = name.toString()
                         val man = manufacturer.toString()
+                        val mat = material.toString()
 
                         val y = year.toIntOrNull() ?: 2025
                         val p = price.toDoubleOrNull() ?: 0.0
 
                         when (category) {
                             "Деталь" -> scope.launch {
-                                val mat = material.toString()
-                                val detail = DetailEntity(id = 0,
+                                val detail = DetailEntity(
                                     assemblyId = null,
                                     warehouseId = warehouseId,
                                     name = n,
@@ -1312,15 +1322,25 @@ fun AddTab(
                                 )
 
                                 val newId = assemblyRepo.insertAssembly(assembly)
-                                assembly.id = newId.toInt()
+                                val assemblyId = newId.toInt()
 
-                                selectedDetails.forEach { d ->
-                                    d.assemblyId = assembly.id
-                                    detailRepo.updateDetail(d)
+                                Log.d("DEBUG", "Selected details: $selectedDetailIds")
+
+                                selectedDetailIds.forEach { detailId ->
+                                    Log.d("DEBUG", "Updating detail $detailId with assemblyId $assemblyId")
+                                    detailRepo.updateAssemblyIdForDetail(detailId, assemblyId)
                                 }
+
 
                                 allAssemblies = assemblyRepo.getAssembliesByWarehouse(warehouseId)
                                 allDetails = detailRepo.getDetailsByWarehouse(warehouseId)
+
+                                // сброс полей
+                                category = null; name = ""; manufacturer = ""; year = ""; price = ""; material = ""
+                                selectedDetailIds = emptySet(); selectedAssemblies = emptySet()
+                                searchQueryDetails = ""; searchResultsDetails = emptyList()
+                                searchQueryAssemblies = ""; searchResultsAssemblies = emptyList()
+                                showErrors = false
                             }
                             "Механізм" -> scope.launch {
                                 val mechanism = MechanismEntity(0,
@@ -1329,27 +1349,34 @@ fun AddTab(
                                     man,
                                     y,
                                     p)
-                                mechanismRepo.insertMechanism(mechanism)
-                                // добавить связи с выбранными узлами
-                                selectedAssemblies.forEach { a ->
-                                    a.mechanismId = mechanism.id
-                                    assemblyRepo.updateAssembly(a)
+
+                                val newId = mechanismRepo.insertMechanism(mechanism)
+                                val mechanismId = newId.toInt()
+
+                                selectedAssemblies.forEach { assembly ->
+                                    val updated = assembly.copy(
+                                        mechanismId = mechanismId
+                                    )
+
+                                    assemblyRepo.updateAssembly(updated)
                                 }
+                                allAssemblies = assemblyRepo.getAssembliesByWarehouse(warehouseId)
+
+                                category = null; name = ""; manufacturer = ""; year = ""; price = ""; material = ""
+                                selectedDetailIds = emptySet(); selectedAssemblies = emptySet()
+                                searchQueryDetails = ""; searchResultsDetails = emptyList()
+                                searchQueryAssemblies = ""; searchResultsAssemblies = emptyList()
+                                showErrors = false
                             }
                         }
 
-                        // сброс полей
-                        category = null; name = ""; manufacturer = ""; year = ""; price = ""; material = ""
-                        selectedDetails = emptySet(); selectedAssemblies = emptySet()
-                        searchQueryDetails = ""; searchResultsDetails = emptyList()
-                        searchQueryAssemblies = ""; searchResultsAssemblies = emptyList()
-                        showErrors = false
+
                     }) { Text("Додати") }
 
                     Button(onClick = {
                         showErrors = false; category = null
                         name = ""; manufacturer = ""; year = ""; price = ""; material = ""
-                        selectedDetails = emptySet(); selectedAssemblies = emptySet()
+                        selectedDetailIds = emptySet(); selectedAssemblies = emptySet()
                         searchQueryDetails = ""; searchResultsDetails = emptyList()
                         searchQueryAssemblies = ""; searchResultsAssemblies = emptyList()
                     }) { Text("Назад") }
