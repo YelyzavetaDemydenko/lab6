@@ -28,4 +28,7 @@ interface AssemblyDao {
 
     @Query("SELECT * FROM assembly WHERE mechanismId = :mechanismId")
     suspend fun getByMechanism(mechanismId: Int): List<AssemblyEntity>
+
+    @Query("DELETE FROM assembly WHERE mechanismId = :mechanismId")
+    suspend fun deleteAssembliesByMechanismId(mechanismId: Int)
 }

@@ -21,5 +21,6 @@ class OfflineAssemblyRepository(private val dao: AssemblyDao) : AssemblyReposito
 
     override suspend fun deleteAssembly(assembly: AssemblyEntity) = dao.delete(assembly)
 
-
+    override suspend fun deleteAssembliesByMechanismId(mechanismId: Int) =
+        dao.deleteAssembliesByMechanismId(mechanismId)
 }

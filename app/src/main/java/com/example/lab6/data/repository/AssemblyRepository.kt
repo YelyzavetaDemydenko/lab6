@@ -10,4 +10,5 @@ interface AssemblyRepository {
     suspend fun insertAssembly(assembly: AssemblyEntity) : Long
     suspend fun updateAssembly(assembly: AssemblyEntity)
     suspend fun deleteAssembly(assembly: AssemblyEntity)
+    suspend fun deleteAssembliesByMechanismId(mechanismId: Int)
 }

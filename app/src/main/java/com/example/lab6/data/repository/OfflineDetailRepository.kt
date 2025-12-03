@@ -31,4 +31,7 @@ class OfflineDetailRepository(private val dao: DetailDao) : DetailRepository {
     override suspend fun updateAssemblyIdForDetail(detailId: Int, assemblyId: Int?) {
         dao.updateAssemblyIdForDetail(detailId, assemblyId)
     }
+
+    override suspend fun deleteDetailsByAssemblyId(assemblyId: Int) =
+        dao.deleteDetailsByAssemblyId(assemblyId)
 }

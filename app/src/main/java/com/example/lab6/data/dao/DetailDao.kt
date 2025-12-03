@@ -30,4 +30,7 @@ interface DetailDao {
 
     @Query("UPDATE details SET assemblyId = :assemblyId WHERE id = :detailId")
     suspend fun updateAssemblyIdForDetail(detailId: Int, assemblyId: Int?)
+
+    @Query("DELETE FROM details WHERE assemblyId = :assemblyId")
+    suspend fun deleteDetailsByAssemblyId(assemblyId: Int)
 }

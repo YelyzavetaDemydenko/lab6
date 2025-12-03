@@ -474,7 +474,9 @@ fun WarehouseTab(
                 assemblyRepo = assemblyRepo,
                 detailRepo = detailRepo,
                 onDeleteAssembly = { assembly ->
-                    scope.launch { assemblyRepo.deleteAssembly(assembly) }
+                    scope.launch {
+                        detailRepo.deleteDetailsByAssemblyId(assembly.id)
+                        assemblyRepo.deleteAssembly(assembly) }
                 },
                 onUpdateAssembly = {assembly ->
                     scope.launch { assemblyRepo.updateAssembly(assembly)}
@@ -485,7 +487,17 @@ fun WarehouseTab(
                 mechanismRepo = mechanismRepo,
                 assemblyRepo = assemblyRepo,
                 onDeleteMechanism = { mechanism ->
-                    scope.launch { mechanismRepo.deleteMechanism(mechanism) }
+                    scope.launch {
+
+                        val assemblies = assemblyRepo.getAssembliesByMechanism(mechanism.id)
+
+                        assemblies.forEach { assembly ->
+                            detailRepo.deleteDetailsByAssemblyId(assembly.id)
+                        }
+
+                        assemblyRepo.deleteAssembliesByMechanismId(mechanism.id)
+
+                        mechanismRepo.deleteMechanism(mechanism)}
                 },
                 onUpdateMechanism = {mechanism ->
                     scope.launch { mechanismRepo.updateMechanism(mechanism)}
