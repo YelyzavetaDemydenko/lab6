@@ -1,6 +1,5 @@
 package com.example.lab6
 
-import com.example.lab6.data.DataStorage
 import com.example.lab6.logic.Assembly
 import com.example.lab6.logic.Detail
 import com.example.lab6.logic.Mechanism
