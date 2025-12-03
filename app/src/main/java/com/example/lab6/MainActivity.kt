@@ -541,8 +541,11 @@ fun DetailsList(
     var details by remember { mutableStateOf<List<DetailEntity>>(emptyList()) }
 
     LaunchedEffect(warehouseId) {
-        details = detailRepo.getDetailsByWarehouse(warehouseId)
+        details = detailRepo
+            .getDetailsByWarehouse(warehouseId)
+            .filter {it.assemblyId == null}
     }
+
 
     LazyColumn {
         if (details.isEmpty()) {
@@ -722,7 +725,9 @@ fun AssembliesList(warehouseId: Int,
     var assemblies by remember { mutableStateOf<List<AssemblyEntity>>(emptyList()) }
 
     LaunchedEffect(warehouseId) {
-        assemblies = assemblyRepo.getAssembliesByWarehouse(warehouseId)
+        assemblies = assemblyRepo
+            .getAssembliesByWarehouse(warehouseId)
+            .filter { it.mechanismId == null }
     }
 
     LazyColumn {
@@ -1310,6 +1315,13 @@ fun AddTab(
                                 )
                                 detailRepo.insertDetail(detail)
                                 allDetails = detailRepo.getDetailsByWarehouse(warehouseId)
+
+                                // сброс полей
+                                category = null; name = ""; manufacturer = ""; year = ""; price = ""; material = ""
+                                selectedDetailIds = emptySet(); selectedAssemblies = emptySet()
+                                searchQueryDetails = ""; searchResultsDetails = emptyList()
+                                searchQueryAssemblies = ""; searchResultsAssemblies = emptyList()
+                                showErrors = false
                             }
                             "Вузол" -> scope.launch {
                                 val assembly = AssemblyEntity(
