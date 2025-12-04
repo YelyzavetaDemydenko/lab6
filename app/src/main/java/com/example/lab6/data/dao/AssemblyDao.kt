@@ -5,14 +5,13 @@ import androidx.room.Insert
 import androidx.room.Update
 import androidx.room.Delete
 import androidx.room.Query
-
+import kotlinx.coroutines.flow.Flow
 import com.example.lab6.data.entities.AssemblyEntity
-
 
 @Dao
 interface AssemblyDao {
     @Insert
-    suspend fun insert(assembly: AssemblyEntity) : Long
+    suspend fun insert(assembly: AssemblyEntity): Long
 
     @Update
     suspend fun update(assembly: AssemblyEntity)
@@ -21,13 +20,13 @@ interface AssemblyDao {
     suspend fun delete(assembly: AssemblyEntity)
 
     @Query("SELECT * FROM assembly")
-    suspend fun getAll(): List<AssemblyEntity>
+    fun getAll(): Flow<List<AssemblyEntity>>
 
     @Query("SELECT * FROM assembly WHERE warehouseId = :warehouseId")
-    suspend fun getByWarehouse(warehouseId: Int): List<AssemblyEntity>
+    fun getByWarehouse(warehouseId: Int): Flow<List<AssemblyEntity>>
 
     @Query("SELECT * FROM assembly WHERE mechanismId = :mechanismId")
-    suspend fun getByMechanism(mechanismId: Int): List<AssemblyEntity>
+    fun getByMechanism(mechanismId: Int): Flow<List<AssemblyEntity>>
 
     @Query("DELETE FROM assembly WHERE mechanismId = :mechanismId")
     suspend fun deleteAssembliesByMechanismId(mechanismId: Int)

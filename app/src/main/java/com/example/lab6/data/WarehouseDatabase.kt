@@ -20,7 +20,7 @@ import com.example.lab6.data.entities.WarehouseEntity
         MechanismEntity::class,
         WarehouseEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -38,7 +38,10 @@ abstract class AppDatabase : RoomDatabase() {
                     context,
                     AppDatabase::class.java,
                     "app_database"
-                ).build().also { instance = it }
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
+                    .also { instance = it }
             }
         }
     }

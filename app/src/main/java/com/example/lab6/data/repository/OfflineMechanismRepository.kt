@@ -2,16 +2,14 @@ package com.example.lab6.data.repository
 
 import com.example.lab6.data.dao.MechanismDao
 import com.example.lab6.data.entities.MechanismEntity
+import kotlinx.coroutines.flow.Flow
 
 class OfflineMechanismRepository(private val dao: MechanismDao) : MechanismRepository {
 
-    override suspend fun getAllMechanisms(): List<MechanismEntity> {
-        return dao.getAll()
-    }
+    override fun getAllMechanisms(): Flow<List<MechanismEntity>> = dao.getAll()
 
-    override suspend fun getMechanismsByWarehouse(warehouseId: Int): List<MechanismEntity> {
-        return dao.getByWarehouse(warehouseId)
-    }
+    override fun getMechanismsByWarehouse(warehouseId: Int): Flow<List<MechanismEntity>> =
+        dao.getByWarehouse(warehouseId)
 
     override suspend fun insertMechanism(mechanism: MechanismEntity): Long {
         return dao.insert(mechanism)

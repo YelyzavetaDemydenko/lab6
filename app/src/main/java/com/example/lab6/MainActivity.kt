@@ -67,7 +67,6 @@ import com.example.lab6.data.entities.DetailEntity
 import com.example.lab6.data.entities.MechanismEntity
 import kotlinx.coroutines.launch
 
-
 import com.example.lab6.data.repository.WarehouseRepository
 import com.example.lab6.data.entities.WarehouseEntity
 import com.example.lab6.data.repository.AssemblyRepository
@@ -77,6 +76,28 @@ import com.example.lab6.data.repository.OfflineAssemblyRepository
 import com.example.lab6.data.repository.OfflineDetailRepository
 import com.example.lab6.data.repository.OfflineMechanismRepository
 import com.example.lab6.data.repository.OfflineWarehouseRepository
+
+import android.Manifest
+import android.content.ContentValues
+import android.content.Context
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.MediaStore
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.*
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+
+import coil.compose.AsyncImage
+import androidx.core.net.toUri
+import kotlinx.coroutines.flow.first
+
+import kotlinx.coroutines.flow.map
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -487,16 +508,16 @@ fun WarehouseTab(
                 assemblyRepo = assemblyRepo,
                 onDeleteMechanism = { mechanism ->
                     scope.launch {
-
-                        val assemblies = assemblyRepo.getAssembliesByMechanism(mechanism.id)
+                        // Берём первое значение из Flow (текущий список сборок)
+                        val assemblies = assemblyRepo.getAssembliesByMechanism(mechanism.id).first()
 
                         assemblies.forEach { assembly ->
                             detailRepo.deleteDetailsByAssemblyId(assembly.id)
                         }
 
                         assemblyRepo.deleteAssembliesByMechanismId(mechanism.id)
-
-                        mechanismRepo.deleteMechanism(mechanism)}
+                        mechanismRepo.deleteMechanism(mechanism)
+                    }
                 },
                 onUpdateMechanism = {mechanism ->
                     scope.launch { mechanismRepo.updateMechanism(mechanism)}
@@ -548,14 +569,9 @@ fun DetailsList(
     onDeleteDetail: (DetailEntity) -> Unit,
     onUpdateDetail: (DetailEntity) -> Unit
 ) {
-    // Тягнемо деталі з БД по складу
-    var details by remember { mutableStateOf<List<DetailEntity>>(emptyList()) }
-
-    LaunchedEffect(warehouseId) {
-        details = detailRepo
-            .getDetailsByWarehouse(warehouseId)
-            .filter {it.assemblyId == null}
-    }
+    val details by detailRepo.getDetailsByWarehouse(warehouseId)
+        .map { it.filter { it.assemblyId == null } }
+        .collectAsState(initial = emptyList())
 
 
     LazyColumn {
@@ -585,6 +601,7 @@ fun DetailsList(
                         .padding(vertical = 4.dp)
                 ) {
 
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -610,6 +627,17 @@ fun DetailsList(
                                 contentDescription = "Редагувати"
                             )
                         }
+                    }
+
+                    if (!detail.photoUri.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = detail.photoUri,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            contentScale = ContentScale.Fit
+                        )
                     }
 
                     if (expanded) {
@@ -733,13 +761,10 @@ fun AssembliesList(warehouseId: Int,
                    onUpdateAssembly: (AssemblyEntity) -> Unit
 ) {
 
-    var assemblies by remember { mutableStateOf<List<AssemblyEntity>>(emptyList()) }
+    val assemblies by assemblyRepo.getAssembliesByWarehouse(warehouseId)
+        .map { it.filter { it.mechanismId == null } }
+        .collectAsState(initial = emptyList())
 
-    LaunchedEffect(warehouseId) {
-        assemblies = assemblyRepo
-            .getAssembliesByWarehouse(warehouseId)
-            .filter { it.mechanismId == null }
-    }
 
     LazyColumn {
         if (assemblies.isEmpty()) {
@@ -790,14 +815,27 @@ fun AssembliesList(warehouseId: Int,
                         }
                     }
 
+
+                    if (!assembly.photoUri.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = assembly.photoUri,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+
+
                     // ===== Раскрытая часть =====
                     if (expanded) {
 
                         if (!isEditing) {
                             // Просмотр обычных данных
-                            val assemblyDetails by produceState(initialValue = emptyList<DetailEntity>(), assembly) {
-                                value = detailRepo.getDetailsByAssembly(assembly.id)
-                            }
+                            val assemblyDetails by detailRepo
+                                .getDetailsByAssembly(assembly.id)
+                                .collectAsState(initial = emptyList())
 
                             Column(modifier = Modifier.padding(start = 26.dp)) {
                                 Text("- Виробник: ${assembly.manufacturer}")
@@ -920,11 +958,10 @@ fun MechanismsList(
     onUpdateMechanism: (MechanismEntity) -> Unit
 ) {
 
-    var mechanisms by remember { mutableStateOf<List<MechanismEntity>>(emptyList()) }
+    val mechanisms by mechanismRepo
+        .getMechanismsByWarehouse(warehouseId)
+        .collectAsState(initial = emptyList())
 
-    LaunchedEffect(warehouseId) {
-        mechanisms = mechanismRepo.getMechanismsByWarehouse(warehouseId)
-    }
 
     LazyColumn {
         if (mechanisms.isEmpty()) {
@@ -974,12 +1011,24 @@ fun MechanismsList(
                         }
                     }
 
+                    if (!mechanism.photoUri.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = mechanism.photoUri,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+
                     if (expanded) {
+
                         if (!isEditing) {
                             // Просмотр обычных данных
-                            val mechanismAssemblies by produceState(initialValue = emptyList<AssemblyEntity>(), mechanism) {
-                                value = assemblyRepo.getAssembliesByMechanism(mechanism.id)
-                            }
+                            val mechanismAssemblies by assemblyRepo
+                                .getAssembliesByMechanism(mechanism.id) // Flow<List<AssemblyEntity>>
+                                .collectAsState(initial = emptyList())
 
                             Column(modifier = Modifier.padding(start = 26.dp)) {
                                 Text("- Виробник: ${mechanism.manufacturer}")
@@ -1095,7 +1144,16 @@ fun MechanismsList(
 
 
 
-
+fun createImageUri(context: Context): Uri {
+    val contentValues = ContentValues().apply {
+        put(MediaStore.Images.Media.TITLE, "new_photo")
+        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+    }
+    return context.contentResolver.insert(
+        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+        contentValues
+    )!!
+}
 
 @Composable
 fun AddTab(
@@ -1122,13 +1180,70 @@ fun AddTab(
     var searchResultsAssemblies by remember { mutableStateOf(listOf<AssemblyEntity>()) }
     var selectedAssemblies by remember { mutableStateOf(setOf<AssemblyEntity>()) }
 
-    // Загружаем все детали и узлы по складу для поиска
-    var allDetails by remember { mutableStateOf(listOf<DetailEntity>()) }
-    var allAssemblies by remember { mutableStateOf(listOf<AssemblyEntity>()) }
+    var photoUri by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(warehouseId) {
-        allDetails = detailRepo.getDetailsByWarehouse(warehouseId)
-        allAssemblies = assemblyRepo.getAssembliesByWarehouse(warehouseId)
+
+    // Загружаем все детали и узлы
+    val allDetails by detailRepo
+        .getDetailsByWarehouse(warehouseId)
+        .collectAsState(initial = emptyList())
+
+    val allAssemblies by assemblyRepo
+        .getAssembliesByWarehouse(warehouseId)
+        .collectAsState(initial = emptyList())
+
+
+    // --- Фото ---
+    val context = LocalContext.current
+    var tempPhotoUri by remember { mutableStateOf<Uri?>(null) }
+
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && tempPhotoUri != null) {
+            photoUri = tempPhotoUri.toString()   // ← фото записується у твою змінну photoUri
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            val uri = createImageUri(context)
+            tempPhotoUri = uri
+            takePictureLauncher.launch(uri)
+        } else {
+            Toast.makeText(context, "Дозвіл на камеру відхилено", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // --- Photo Picker ---
+    val pickImageLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            photoUri = uri.toString()
+        }
+    }
+
+    fun onPickFromGalleryClick() {
+        pickImageLauncher.launch(
+            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+        )
+    }
+
+    fun onAddPhotoClick() {
+        when {
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED -> {
+                val uri = createImageUri(context)
+                tempPhotoUri = uri
+                takePictureLauncher.launch(uri)
+            }
+
+            else -> cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
     }
 
     LazyColumn(
@@ -1167,6 +1282,26 @@ fun AddTab(
                 )
                 if (showErrors && name.isBlank())
                     Text("Це поле обов'язкове", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+            }
+
+
+
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("Додати фото:", fontSize = 20.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { onAddPhotoClick() }) {
+                        Text("Зробити фото")
+                    }
+
+                    Button(onClick = { onPickFromGalleryClick() }) {
+                        Text("Обрати з галереї")
+                    }
+                }
+
+                if (photoUri != null) {
+                    Text("Фото додано ✔")
+                }
             }
 
             item {
@@ -1212,6 +1347,9 @@ fun AddTab(
                     )
                 }
             }
+
+
+
 
             // ---------- Вузол ----------
             if (category == "Вузол") {
@@ -1298,6 +1436,8 @@ fun AddTab(
                 } else item { Text("(Пошук нічого не знайшов)", modifier = Modifier.padding(8.dp)) }
             }
 
+
+
             // ---------- Кнопки ----------
             item {
                 Spacer(modifier = Modifier.height(12.dp))
@@ -1322,10 +1462,11 @@ fun AddTab(
                                     manufacturer = man,
                                     year = y,
                                     price = p,
-                                    material = mat
+                                    material = mat,
+                                    photoUri = photoUri
                                 )
                                 detailRepo.insertDetail(detail)
-                                allDetails = detailRepo.getDetailsByWarehouse(warehouseId)
+                                //allDetails = detailRepo.getDetailsByWarehouse(warehouseId)
 
                                 // сброс полей
                                 category = null; name = ""; manufacturer = ""; year = ""; price = ""; material = ""
@@ -1341,7 +1482,8 @@ fun AddTab(
                                     name = n,
                                     manufacturer = man,
                                     year = y,
-                                    price = p
+                                    price = p,
+                                    photoUri = photoUri
                                 )
 
                                 val newId = assemblyRepo.insertAssembly(assembly)
@@ -1355,8 +1497,8 @@ fun AddTab(
                                 }
 
 
-                                allAssemblies = assemblyRepo.getAssembliesByWarehouse(warehouseId)
-                                allDetails = detailRepo.getDetailsByWarehouse(warehouseId)
+                                //allAssemblies = assemblyRepo.getAssembliesByWarehouse(warehouseId)
+                                //allDetails = detailRepo.getDetailsByWarehouse(warehouseId)
 
                                 // сброс полей
                                 category = null; name = ""; manufacturer = ""; year = ""; price = ""; material = ""
@@ -1371,7 +1513,8 @@ fun AddTab(
                                     n,
                                     man,
                                     y,
-                                    p)
+                                    p,
+                                    photoUri = photoUri)
 
                                 val newId = mechanismRepo.insertMechanism(mechanism)
                                 val mechanismId = newId.toInt()
@@ -1383,7 +1526,7 @@ fun AddTab(
 
                                     assemblyRepo.updateAssembly(updated)
                                 }
-                                allAssemblies = assemblyRepo.getAssembliesByWarehouse(warehouseId)
+                                //allAssemblies = assemblyRepo.getAssembliesByWarehouse(warehouseId)
 
                                 category = null; name = ""; manufacturer = ""; year = ""; price = ""; material = ""
                                 selectedDetailIds = emptySet(); selectedAssemblies = emptySet()

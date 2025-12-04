@@ -5,13 +5,13 @@ import androidx.room.Insert
 import androidx.room.Update
 import androidx.room.Delete
 import androidx.room.Query
-
 import com.example.lab6.data.entities.MechanismEntity
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface MechanismDao {
     @Insert
-    suspend fun insert(mechanism: MechanismEntity) : Long
+    suspend fun insert(mechanism: MechanismEntity): Long
 
     @Update
     suspend fun update(mechanism: MechanismEntity)
@@ -20,8 +20,8 @@ interface MechanismDao {
     suspend fun delete(mechanism: MechanismEntity)
 
     @Query("SELECT * FROM mechanism")
-    suspend fun getAll(): List<MechanismEntity>
+    fun getAll(): Flow<List<MechanismEntity>>
 
     @Query("SELECT * FROM mechanism WHERE warehouseId = :warehouseId")
-    suspend fun getByWarehouse(warehouseId: Int): List<MechanismEntity>
+    fun getByWarehouse(warehouseId: Int): Flow<List<MechanismEntity>>
 }

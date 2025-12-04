@@ -1,12 +1,13 @@
 package com.example.lab6.data.repository
 
 import com.example.lab6.data.entities.DetailEntity
+import kotlinx.coroutines.flow.Flow
 
 
 interface DetailRepository {
-    suspend fun getAllDetails(): List<DetailEntity>
-    suspend fun getDetailsByWarehouse(warehouseId: Int): List<DetailEntity>
-    suspend fun getDetailsByAssembly(assemblyId: Int): List<DetailEntity>
+    fun getAllDetails(): Flow<List<DetailEntity>>
+    fun getDetailsByWarehouse(warehouseId: Int): Flow<List<DetailEntity>>
+    fun getDetailsByAssembly(assemblyId: Int): Flow<List<DetailEntity>>
     suspend fun insertDetail(detail: DetailEntity)
     suspend fun updateDetail(detail: DetailEntity)
     suspend fun deleteDetail(detail: DetailEntity)

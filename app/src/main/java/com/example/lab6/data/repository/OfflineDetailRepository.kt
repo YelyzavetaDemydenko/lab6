@@ -2,17 +2,17 @@ package com.example.lab6.data.repository
 
 import com.example.lab6.data.dao.DetailDao
 import com.example.lab6.data.entities.DetailEntity
+import kotlinx.coroutines.flow.Flow
 
 class OfflineDetailRepository(private val dao: DetailDao) : DetailRepository {
 
-    override suspend fun getAllDetails(): List<DetailEntity> {
-        return dao.getAll()
-    }
+    override fun getAllDetails(): Flow<List<DetailEntity>> =
+        dao.getAll()
 
-    override suspend fun getDetailsByWarehouse(warehouseId: Int) =
+    override fun getDetailsByWarehouse(warehouseId: Int): Flow<List<DetailEntity>> =
         dao.getByWarehouse(warehouseId)
 
-    override suspend fun getDetailsByAssembly(assemblyId: Int) =
+    override fun getDetailsByAssembly(assemblyId: Int): Flow<List<DetailEntity>> =
         dao.getByAssembly(assemblyId)
 
 

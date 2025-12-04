@@ -7,6 +7,7 @@ import androidx.room.Insert
 import androidx.room.Update
 import androidx.room.Delete
 import androidx.room.Query
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface DetailDao {
@@ -20,13 +21,13 @@ interface DetailDao {
     suspend fun delete(detail: DetailEntity)
 
     @Query("SELECT * FROM details")
-    suspend fun getAll(): List<DetailEntity>
+    fun getAll(): Flow<List<DetailEntity>>
 
     @Query("SELECT * FROM details WHERE warehouseId = :warehouseId")
-    suspend fun getByWarehouse(warehouseId: Int): List<DetailEntity>
+    fun getByWarehouse(warehouseId: Int): Flow<List<DetailEntity>>
 
     @Query("SELECT * FROM details WHERE assemblyId = :assemblyId")
-    suspend fun getByAssembly(assemblyId: Int): List<DetailEntity>
+    fun getByAssembly(assemblyId: Int): Flow<List<DetailEntity>>
 
     @Query("UPDATE details SET assemblyId = :assemblyId WHERE id = :detailId")
     suspend fun updateAssemblyIdForDetail(detailId: Int, assemblyId: Int?)

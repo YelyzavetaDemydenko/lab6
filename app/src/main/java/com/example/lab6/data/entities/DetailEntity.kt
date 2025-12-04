@@ -13,5 +13,6 @@ data class DetailEntity(
     var manufacturer: String,
     val year: Int,
     val price: Double,
-    var material: String
+    var material: String,
+    val photoUri: String? = null
 )

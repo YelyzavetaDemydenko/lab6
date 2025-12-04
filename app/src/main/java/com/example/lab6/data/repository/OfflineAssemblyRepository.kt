@@ -2,15 +2,16 @@ package com.example.lab6.data.repository
 
 import com.example.lab6.data.dao.AssemblyDao
 import com.example.lab6.data.entities.AssemblyEntity
-
+import kotlinx.coroutines.flow.Flow
 
 class OfflineAssemblyRepository(private val dao: AssemblyDao) : AssemblyRepository {
-    override suspend fun getAllAssemblies(): List<AssemblyEntity> = dao.getAll()
 
-    override suspend fun getAssembliesByWarehouse(warehouseId: Int): List<AssemblyEntity> =
+    override fun getAllAssemblies(): Flow<List<AssemblyEntity>> = dao.getAll()
+
+    override fun getAssembliesByWarehouse(warehouseId: Int): Flow<List<AssemblyEntity>> =
         dao.getByWarehouse(warehouseId)
 
-    override suspend fun getAssembliesByMechanism(mechanismId: Int): List<AssemblyEntity> =
+    override fun getAssembliesByMechanism(mechanismId: Int): Flow<List<AssemblyEntity>> =
         dao.getByMechanism(mechanismId)
 
     override suspend fun insertAssembly(assembly: AssemblyEntity): Long {

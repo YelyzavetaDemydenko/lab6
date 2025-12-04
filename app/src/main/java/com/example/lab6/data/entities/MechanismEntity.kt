@@ -11,5 +11,6 @@ data class MechanismEntity(
     val name: String,
     val manufacturer: String,
     val year: Int,
-    val price: Double
+    val price: Double,
+    val photoUri: String? = null
 )
