@@ -81,6 +81,7 @@ import android.Manifest
 import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.Geocoder
 import android.net.Uri
 import android.provider.MediaStore
 import android.widget.Toast
@@ -94,9 +95,15 @@ import androidx.core.content.ContextCompat
 
 import coil.compose.AsyncImage
 import androidx.core.net.toUri
+import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.flow.first
 
 import kotlinx.coroutines.flow.map
+
+
+import androidx.activity.compose.rememberLauncherForActivityResult
+
+import com.google.android.gms.location.Priority
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -196,8 +203,53 @@ fun RegisterScreen(
     var password by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
     var showErrors by remember { mutableStateOf(false) }
+    var address by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    // Launcher для запиту дозволу на локацію
+    val requestLocationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+
+            if (ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
+            ) {
+
+                val fusedLocation = LocationServices.getFusedLocationProviderClient(context)
+
+                try {
+                    fusedLocation.getCurrentLocation(
+                        Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                        null
+                    ).addOnSuccessListener { location ->
+                        if (location != null) {
+                            val geoCoder = Geocoder(context)
+                            val list = geoCoder.getFromLocation(location.latitude, location.longitude, 1)
+
+                            address = list?.firstOrNull()?.getAddressLine(0)
+                                ?: "Адреса не визначена"
+
+                            message = "Адреса визначена: $address"
+                        } else {
+                            message = "Не вдалося визначити локацію"
+                        }
+                    }
+                } catch (e: Exception) {
+                    message = "Помилка доступу до локації"
+                }
+            }
+
+
+        } else {
+            message = "Дозвіл на локацію відхилено"
+        }
+    }
+
 
     Column(
         modifier = Modifier
@@ -241,18 +293,38 @@ fun RegisterScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Кнопка для додавання місцезнаходження
+        Button(
+            onClick = {
+                requestLocationPermission.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+            },
+            modifier = Modifier.padding(vertical = 8.dp)
+        ) {
+            Text("Додати місцезнаходження")
+        }
+
+        // Виводимо поточну адресу
+        if (!address.isNullOrEmpty()) {
+            Text("Адреса: $address", modifier = Modifier.padding(vertical = 4.dp))
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
         Button(
             onClick = {
                 showErrors = true
                 if (login.isBlank() || password.isBlank()) return@Button
 
-                // Запускаем корутину для работы с Room
                 scope.launch {
                     val existing = warehouseRepo.getWarehouseByLogin(login, password)
                     if (existing != null) {
                         message = "Такий логін уже існує!"
                     } else {
-                        val newWh = WarehouseEntity(name = login, password = password)
+                        val newWh = WarehouseEntity(
+                            name = login,
+                            password = password,
+                            address = address
+                        )
                         warehouseRepo.insertWarehouse(newWh)
                         onRegisterSuccess(newWh)
                     }
@@ -273,6 +345,7 @@ fun RegisterScreen(
         }
     }
 }
+
 
 
 @Composable

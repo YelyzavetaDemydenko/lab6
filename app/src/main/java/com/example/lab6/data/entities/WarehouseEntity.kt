@@ -9,5 +9,7 @@ data class WarehouseEntity(
     val id: Int = 0,
 
     val name: String,
-    val password: String
+    val password: String,
+    val address: String? = null
+
 )
